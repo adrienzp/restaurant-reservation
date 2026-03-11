@@ -11,7 +11,7 @@ export default function Home() {
   const [succes, setSucces] = useState(false)
   const [erreur, setErreur] = useState('')
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
