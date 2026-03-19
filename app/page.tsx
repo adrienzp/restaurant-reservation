@@ -1,114 +1,191 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
 
-export default function Home() {
+const HEURES = ['12:00','12:30','13:00','13:30','19:00','19:30','20:00','20:30','21:00','21:30']
+
+export default function ReservationPage() {
   const [form, setForm] = useState({
-    nom: '', email: '', telephone: '', date: '', heure: '', personnes: 1, message: ''
+    nom: '', email: '', telephone: '', date: '', heure: '', personnes: '2', message: ''
   })
   const [loading, setLoading] = useState(false)
-  const [succes, setSucces] = useState(false)
+  const [succes, setSucces] = useState<{ table: string } | null>(null)
   const [erreur, setErreur] = useState('')
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
+    setErreur('')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-  setLoading(true)
-  setErreur('')
+    e.preventDefault()
+    setLoading(true)
+    setErreur('')
 
-  const res = await fetch('/api/reservation', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(form)
-  })
+    const res = await fetch('/api/reservation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form)
+    })
 
-  if (res.ok) {
-    setSucces(true)
-  } else {
-    setErreur('Une erreur est survenue, veuillez réessayer.')
+    const data = await res.json()
+
+    if (res.ok) {
+      setSucces({ table: data.table })
+    } else {
+      setErreur(data.error || 'Une erreur est survenue, veuillez réessayer.')
+    }
+    setLoading(false)
   }
-  setLoading(false)
-}
+
+  const today = new Date().toISOString().split('T')[0]
 
   if (succes) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white p-10 rounded-2xl shadow text-center">
-        <div className="text-5xl mb-4">🎉</div>
-        <h2 className="text-2xl font-bold mb-2">Réservation confirmée !</h2>
-        <p className="text-gray-500">Nous vous contacterons pour confirmer votre table.</p>
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#faf9f7', fontFamily: 'Georgia, serif', padding: '24px'
+    }}>
+      <div style={{
+        background: 'white', padding: '48px', borderRadius: '4px',
+        textAlign: 'center', maxWidth: '480px', width: '100%',
+        border: '1px solid #e8e4de'
+      }}>
+        <div style={{
+          width: '56px', height: '56px', borderRadius: '50%',
+          background: '#f0f7f0', border: '1px solid #c3dfc3',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 24px', fontSize: '24px'
+        }}>✓</div>
+        <h2 style={{ fontSize: '24px', fontWeight: 'normal', margin: '0 0 8px', color: '#1a1a1a' }}>
+          Réservation confirmée
+        </h2>
+        <p style={{ color: '#888', marginBottom: '24px', fontSize: '14px' }}>
+          Table {succes.table} · Un email de confirmation vous a été envoyé
+        </p>
+        <button
+          onClick={() => { setSucces(null); setForm({ nom: '', email: '', telephone: '', date: '', heure: '', personnes: '2', message: '' }) }}
+          style={{
+            background: 'none', border: '1px solid #c9a96e', color: '#c9a96e',
+            padding: '10px 24px', borderRadius: '2px', cursor: 'pointer',
+            fontSize: '13px', letterSpacing: '0.08em', textTransform: 'uppercase'
+          }}
+        >
+          Nouvelle réservation
+        </button>
       </div>
     </div>
   )
 
+  const inputStyle = {
+    width: '100%', padding: '10px 14px', border: '1px solid #e0dbd4',
+    borderRadius: '2px', fontSize: '15px', color: '#1a1a1a',
+    background: 'white', outline: 'none', boxSizing: 'border-box' as const,
+    fontFamily: 'Georgia, serif', transition: 'border-color 0.2s'
+  }
+
+  const labelStyle = {
+    display: 'block', fontSize: '12px', color: '#888',
+    marginBottom: '6px', letterSpacing: '0.08em', textTransform: 'uppercase' as const
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow p-8 w-full max-w-lg">
-        <h1 className="text-3xl font-bold mb-2">Réserver une table</h1>
-        <p className="text-gray-500 mb-6">Remplissez le formulaire ci-dessous</p>
+    <div style={{
+      minHeight: '100vh', background: '#faf9f7',
+      fontFamily: 'Georgia, serif', padding: '40px 24px',
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }}>
+      <div style={{ maxWidth: '520px', width: '100%' }}>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Nom complet</label>
-            <input name="nom" required onChange={handleChange} value={form.nom}
-              className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black"
-              placeholder="Jean Dupont" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input name="email" type="email" required onChange={handleChange} value={form.email}
-              className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black"
-              placeholder="jean@email.com" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Téléphone</label>
-            <input name="telephone" required onChange={handleChange} value={form.telephone}
-              className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black"
-              placeholder="06 12 34 56 78" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Date</label>
-              <input name="date" type="date" required onChange={handleChange} value={form.date}
-                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black" />
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <p style={{ fontSize: '12px', color: '#c9a96e', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '8px' }}>
+            L'Orfèvre
+          </p>
+          <h1 style={{ fontSize: '32px', fontWeight: 'normal', color: '#1a1a1a', margin: '0 0 8px' }}>
+            Réserver une table
+          </h1>
+          <p style={{ color: '#888', fontSize: '14px', margin: 0 }}>
+            Réservation instantanée · Confirmation par email
+          </p>
+        </div>
+
+        <div style={{ background: 'white', border: '1px solid #e8e4de', borderRadius: '4px', padding: '36px' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={labelStyle}>Nom complet *</label>
+                <input name="nom" required value={form.nom} onChange={handleChange}
+                  style={inputStyle} placeholder="Jean Dupont" />
+              </div>
+              <div>
+                <label style={labelStyle}>Téléphone *</label>
+                <input name="telephone" required value={form.telephone} onChange={handleChange}
+                  style={inputStyle} placeholder="06 12 34 56 78" />
+              </div>
             </div>
+
             <div>
-              <label className="block text-sm font-medium mb-1">Heure</label>
-              <select name="heure" required onChange={handleChange} value={form.heure}
-                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black">
-                <option value="">Choisir</option>
-                {['12:00','12:30','13:00','13:30','19:00','19:30','20:00','20:30','21:00','21:30'].map(h => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
+              <label style={labelStyle}>Email *</label>
+              <input name="email" type="email" required value={form.email} onChange={handleChange}
+                style={inputStyle} placeholder="jean@email.com" />
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Nombre de personnes</label>
-            <select name="personnes" onChange={handleChange} value={form.personnes}
-              className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black">
-              {[1,2,3,4,5,6,7,8].map(n => (
-                <option key={n} value={n}>{n} personne{n > 1 ? 's' : ''}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Message (optionnel)</label>
-            <textarea name="message" onChange={handleChange} value={form.message} rows={3}
-              className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-black"
-              placeholder="Allergie, occasion spéciale..." />
-          </div>
 
-          {erreur && <p className="text-red-500 text-sm">{erreur}</p>}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div style={{ gridColumn: 'span 1' }}>
+                <label style={labelStyle}>Personnes</label>
+                <select name="personnes" value={form.personnes} onChange={handleChange} style={inputStyle}>
+                  {[1,2,3,4,5,6,7,8].map(n => (
+                    <option key={n} value={n}>{n} pers.</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Date *</label>
+                <input name="date" type="date" required min={today} value={form.date} onChange={handleChange}
+                  style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Heure *</label>
+                <select name="heure" required value={form.heure} onChange={handleChange} style={inputStyle}>
+                  <option value="">—</option>
+                  {HEURES.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
+            </div>
 
-          <button type="submit" disabled={loading}
-            className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition disabled:opacity-50">
-            {loading ? 'Envoi en cours...' : 'Réserver ma table'}
-          </button>
-        </form>
+            <div>
+              <label style={labelStyle}>Message (optionnel)</label>
+              <textarea name="message" value={form.message} onChange={handleChange} rows={3}
+                style={{ ...inputStyle, resize: 'vertical' }}
+                placeholder="Allergie, occasion spéciale, demande particulière..." />
+            </div>
+
+            {erreur && (
+              <div style={{
+                background: '#fef2f2', border: '1px solid #fecaca',
+                borderRadius: '2px', padding: '12px 14px',
+                fontSize: '13px', color: '#dc2626'
+              }}>
+                {erreur}
+              </div>
+            )}
+
+            <button type="submit" disabled={loading} style={{
+              background: loading ? '#d4b896' : '#c9a96e',
+              color: 'white', border: 'none', padding: '14px',
+              borderRadius: '2px', fontSize: '13px', letterSpacing: '0.1em',
+              textTransform: 'uppercase', cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'background 0.2s', fontFamily: 'Georgia, serif'
+            }}>
+              {loading ? 'Recherche d\'une table...' : 'Confirmer la réservation'}
+            </button>
+
+          </form>
+        </div>
+
+        <p style={{ textAlign: 'center', color: '#aaa', fontSize: '12px', marginTop: '20px' }}>
+          Une table vous sera assignée automatiquement selon vos préférences
+        </p>
       </div>
     </div>
   )
