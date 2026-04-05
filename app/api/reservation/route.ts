@@ -17,16 +17,16 @@ export async function POST(req: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const { error: insertError } = await supabase.from('reservations').insert([{
-    nom,
-    email,
-    telephone,
-    nb_personnes: parseInt(personnes),
-    date_reservation: date,
-    heure_reservation: heure,
-    message,
-    statut: 'en attente',
-  }])
+ const { error: insertError } = await supabase.from('reservations').insert([{
+  nom,
+  email,
+  telephone,
+  personnes: parseInt(personnes),
+  date,
+  heure,
+  message,
+  statut: 'en attente',
+}])
 
   if (insertError) {
     console.error('Supabase insert error:', insertError)
