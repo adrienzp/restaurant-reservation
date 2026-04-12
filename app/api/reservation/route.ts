@@ -82,6 +82,8 @@ export async function POST(req: Request) {
   try {
     if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY manquante')
     const resend = new Resend(process.env.RESEND_API_KEY)
+
+    // Email de confirmation au client
     await resend.emails.send({
       from: "L'Orfèvre <reservations@burstflow.fr>",
       to: email,
@@ -105,6 +107,28 @@ export async function POST(req: Request) {
             En cas d'empêchement, merci de nous prévenir au <strong>+33 1 42 00 00 00</strong>.
           </p>
           <p style="margin-top: 40px; color: #888; font-size: 13px;">À très bientôt,<br/>L'équipe de L'Orfèvre</p>
+        </div>
+      `
+    })
+
+    // Notification au restaurateur
+    await resend.emails.send({
+      from: "BurstFlow <reservations@burstflow.fr>",
+      to: 'draze.droz@gmail.com',
+      subject: `🔔 Nouvelle réservation — ${nom} · ${new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${heure}`,
+      html: `
+        <div style="font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px 20px; color: #1a1a1a;">
+          <p style="font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 24px;">L'Orfèvre · Nouvelle réservation</p>
+          <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 24px;">${nom}</h2>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 8px 0; color: #666; font-size: 14px; width: 120px;">Date</td><td style="padding: 8px 0; font-size: 14px; font-weight: 600;">${new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666; font-size: 14px;">Heure</td><td style="padding: 8px 0; font-size: 14px; font-weight: 600;">${heure}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666; font-size: 14px;">Couverts</td><td style="padding: 8px 0; font-size: 14px; font-weight: 600;">${personnes} personne${nbPersonnes > 1 ? 's' : ''}</td></tr>
+            <tr><td style="padding: 8px 0; color: #666; font-size: 14px;">Email</td><td style="padding: 8px 0; font-size: 14px;">${email}</td></tr>
+            ${telephone ? `<tr><td style="padding: 8px 0; color: #666; font-size: 14px;">Téléphone</td><td style="padding: 8px 0; font-size: 14px;">${telephone}</td></tr>` : ''}
+            ${table ? `<tr><td style="padding: 8px 0; color: #666; font-size: 14px;">Table assignée</td><td style="padding: 8px 0; font-size: 14px; font-weight: 600;">${table.label}</td></tr>` : ''}
+            ${message ? `<tr><td style="padding: 8px 0; color: #666; font-size: 14px; vertical-align: top;">Message</td><td style="padding: 8px 0; font-size: 14px; font-style: italic;">"${message}"</td></tr>` : ''}
+          </table>
         </div>
       `
     })
