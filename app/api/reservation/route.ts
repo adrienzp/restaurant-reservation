@@ -2,8 +2,6 @@ import { Resend } from 'resend'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const RESTAURANT_ID = '106bab84-a847-4392-8272-4f70fcac3291'
-
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,7 +9,20 @@ function getSupabase() {
   )
 }
 
+async function resolveRestaurant(slug?: string): Promise<{ id: string; nom: string; config: Record<string, unknown> } | null> {
+  const supabase = getSupabase()
+  const effectiveSlug = slug || process.env.DEFAULT_RESTAURANT_SLUG || 'lorfevreparis'
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select('id, nom, config')
+    .eq('slug', effectiveSlug)
+    .single()
+  if (error || !data) return null
+  return data
+}
+
 async function assignerTable(
+  restaurantId: string,
   nbPersonnes: number,
   date: string,
   heure: string
@@ -21,7 +32,7 @@ async function assignerTable(
   const { data: tables, error: tablesError } = await supabase
     .from('floor_tables')
     .select('id, label, number, capacity')
-    .eq('restaurant_id', RESTAURANT_ID)
+    .eq('restaurant_id', restaurantId)
     .eq('status', 'active')
     .gte('capacity', nbPersonnes)
     .order('capacity', { ascending: true })
@@ -36,7 +47,7 @@ async function assignerTable(
   const { data: reservationsOccupees } = await supabase
     .from('reservations')
     .select('table_id')
-    .eq('restaurant_id', RESTAURANT_ID)
+    .eq('restaurant_id', restaurantId)
     .eq('date', date)
     .gte('heure', heureMinus)
     .lte('heure', heurePlus)
@@ -75,24 +86,22 @@ function generateICS(nom: string, date: string, heure: string, personnes: string
 }
 
 export async function POST(req: Request) {
-  const supabase = getSupabase()
   const body = await req.json()
-  const { nom, email, telephone, personnes, date, heure, message } = body
+  const { nom, email, telephone, personnes, date, heure, message, slug } = body
 
   if (!nom || !email || !date || !heure || !personnes) {
     return NextResponse.json({ error: 'Champs obligatoires manquants' }, { status: 400 })
   }
 
-  const nbPersonnes = parseInt(personnes)
-  const table = await assignerTable(nbPersonnes, date, heure)
+  const restaurant = await resolveRestaurant(slug)
+  if (!restaurant) {
+    return NextResponse.json({ error: 'Restaurant introuvable' }, { status: 404 })
+  }
 
-  // Récupérer l'email de notification depuis la config du restaurant
-  const { data: restaurant } = await supabase
-    .from('restaurants')
-    .select('config')
-    .eq('id', RESTAURANT_ID)
-    .single()
-  const notificationEmail: string = restaurant?.config?.notification_email || 'draze.droz@gmail.com'
+  const nbPersonnes = parseInt(personnes)
+  const table = await assignerTable(restaurant.id, nbPersonnes, date, heure)
+
+  const notificationEmail: string = (restaurant.config?.notification_email as string) || 'draze.droz@gmail.com'
 
   const insertData: Record<string, unknown> = {
     nom,
@@ -103,10 +112,11 @@ export async function POST(req: Request) {
     heure,
     message,
     statut: 'en attente',
-    restaurant_id: RESTAURANT_ID,
+    restaurant_id: restaurant.id,
   }
   if (table) insertData.table_id = table.id
 
+  const supabase = getSupabase()
   const { error: insertError } = await supabase.from('reservations').insert([insertData])
 
   if (insertError) {
@@ -118,16 +128,18 @@ export async function POST(req: Request) {
     if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY manquante')
     const resend = new Resend(process.env.RESEND_API_KEY)
 
+    const nomRestaurant = restaurant.nom
+
     // Email de confirmation au client
     const icsContent = generateICS(nom, date, heure, personnes)
     await resend.emails.send({
-      from: "L'Orfèvre <reservations@burstflow.fr>",
+      from: `${nomRestaurant} <reservations@burstflow.fr>`,
       to: email,
-      subject: "✅ Votre réservation est confirmée — L'Orfèvre",
-      attachments: [{ filename: 'reservation-lorfevreparis.ics', content: Buffer.from(icsContent).toString('base64') }],
+      subject: `✅ Votre réservation est confirmée — ${nomRestaurant}`,
+      attachments: [{ filename: `reservation-${slug || 'restaurant'}.ics`, content: Buffer.from(icsContent).toString('base64') }],
       html: `
         <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1a1a1a;">
-          <h1 style="font-size: 28px; font-weight: normal; margin-bottom: 8px;">L'Orfèvre</h1>
+          <h1 style="font-size: 28px; font-weight: normal; margin-bottom: 8px;">${nomRestaurant}</h1>
           <p style="color: #666; margin-bottom: 32px; font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase;">Confirmation de réservation</p>
           <p style="font-size: 18px; margin-bottom: 24px;">Bonjour ${nom},</p>
           <p style="color: #444; line-height: 1.7; margin-bottom: 32px;">
@@ -141,9 +153,9 @@ export async function POST(req: Request) {
             ${table ? `<p style="margin: 4px 0; font-size: 16px;"><strong>Table :</strong> ${table.label}</p>` : ''}
           </div>
           <p style="color: #666; font-size: 14px; line-height: 1.7;">
-            En cas d'empêchement, merci de nous prévenir au <strong>+33 1 42 00 00 00</strong>.
+            En cas d'empêchement, n'hésitez pas à nous contacter.
           </p>
-          <p style="margin-top: 40px; color: #888; font-size: 13px;">À très bientôt,<br/>L'équipe de L'Orfèvre</p>
+          <p style="margin-top: 40px; color: #888; font-size: 13px;">À très bientôt,<br/>L'équipe de ${nomRestaurant}</p>
         </div>
       `
     })
@@ -155,7 +167,7 @@ export async function POST(req: Request) {
       subject: `🔔 Nouvelle réservation — ${nom} · ${new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${heure}`,
       html: `
         <div style="font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px 20px; color: #1a1a1a;">
-          <p style="font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 24px;">L'Orfèvre · Nouvelle réservation</p>
+          <p style="font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 24px;">${nomRestaurant} · Nouvelle réservation</p>
           <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 24px;">${nom}</h2>
           <table style="width: 100%; border-collapse: collapse;">
             <tr><td style="padding: 8px 0; color: #666; font-size: 14px; width: 120px;">Date</td><td style="padding: 8px 0; font-size: 14px; font-weight: 600;">${new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</td></tr>
