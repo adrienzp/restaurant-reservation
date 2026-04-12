@@ -47,6 +47,33 @@ async function assignerTable(
   return tableLibre ? { id: tableLibre.id, label: tableLibre.label || `Table ${tableLibre.number}` } : null
 }
 
+function generateICS(nom: string, date: string, heure: string, personnes: string): string {
+  const [year, month, day] = date.split('-')
+  const [hour, minute] = heure.split(':')
+  const dtStart = `${year}${month}${day}T${hour}${minute}00`
+  const endHour = String(parseInt(hour) + 2).padStart(2, '0')
+  const dtEnd   = `${year}${month}${day}T${endHour}${minute}00`
+  const now     = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//BurstFlow//Restaurant Reservation//FR',
+    'CALSCALE:GREGORIAN',
+    'METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    `UID:${date}-${heure.replace(':', '')}-lorfevreparis@burstflow.fr`,
+    `DTSTAMP:${now}Z`,
+    `DTSTART;TZID=Europe/Paris:${dtStart}`,
+    `DTEND;TZID=Europe/Paris:${dtEnd}`,
+    `SUMMARY:Réservation L'Orfèvre`,
+    `DESCRIPTION:Réservation pour ${personnes} personne${parseInt(personnes) > 1 ? 's' : ''} au nom de ${nom}`,
+    `LOCATION:L'Orfèvre\\, Paris`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n')
+}
+
 export async function POST(req: Request) {
   const supabase = getSupabase()
   const body = await req.json()
@@ -92,10 +119,12 @@ export async function POST(req: Request) {
     const resend = new Resend(process.env.RESEND_API_KEY)
 
     // Email de confirmation au client
+    const icsContent = generateICS(nom, date, heure, personnes)
     await resend.emails.send({
       from: "L'Orfèvre <reservations@burstflow.fr>",
       to: email,
       subject: "✅ Votre réservation est confirmée — L'Orfèvre",
+      attachments: [{ filename: 'reservation-lorfevreparis.ics', content: Buffer.from(icsContent).toString('base64') }],
       html: `
         <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #1a1a1a;">
           <h1 style="font-size: 28px; font-weight: normal; margin-bottom: 8px;">L'Orfèvre</h1>
