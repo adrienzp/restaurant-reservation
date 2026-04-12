@@ -60,7 +60,7 @@ export default function ReservationPage() {
           Réservation confirmée
         </h2>
         <p style={{ color: '#888', marginBottom: '24px', fontSize: '14px' }}>
-          Table {succes.table} · Un email de confirmation vous a été envoyé
+          {succes.table ? `Table ${succes.table} · ` : ''}Un email de confirmation vous a été envoyé
         </p>
         <button
           onClick={() => { setSucces(null); setForm({ nom: '', email: '', telephone: '', date: '', heure: '', personnes: '2', message: '' }) }}
