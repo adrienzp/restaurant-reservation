@@ -109,9 +109,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: insertError.message }, { status: 500 })
   }
 
-  // Si 1-3 étoiles → réponse IA en arrière-plan
+  // Si 1-3 étoiles → réponse IA (on attend la fin avant de répondre)
   if (score <= 3) {
-    envoyerReponseIA(reservation.nom, reservation.email, score, comment ?? '', reservation.date)
+    await envoyerReponseIA(reservation.nom, reservation.email, score, comment ?? '', reservation.date)
   }
 
   return NextResponse.json({
