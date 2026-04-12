@@ -59,6 +59,14 @@ export async function POST(req: Request) {
   const nbPersonnes = parseInt(personnes)
   const table = await assignerTable(nbPersonnes, date, heure)
 
+  // Récupérer l'email de notification depuis la config du restaurant
+  const { data: restaurant } = await supabase
+    .from('restaurants')
+    .select('config')
+    .eq('id', RESTAURANT_ID)
+    .single()
+  const notificationEmail: string = restaurant?.config?.notification_email || 'draze.droz@gmail.com'
+
   const insertData: Record<string, unknown> = {
     nom,
     email,
@@ -114,7 +122,7 @@ export async function POST(req: Request) {
     // Notification au restaurateur
     await resend.emails.send({
       from: "BurstFlow <reservations@burstflow.fr>",
-      to: 'draze.droz@gmail.com',
+      to: notificationEmail,
       subject: `🔔 Nouvelle réservation — ${nom} · ${new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} à ${heure}`,
       html: `
         <div style="font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px 20px; color: #1a1a1a;">
